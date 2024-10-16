@@ -8,6 +8,7 @@
 // @match        https://jpdb.io/kanji/*
 // @grant        GM_addElement
 // @grant        GM_xmlhttpRequest
+// @grant        GM_addStyle
 // @license      MIT
 // ==/UserScript==
 
@@ -42,6 +43,39 @@
         currentAudio: null,
         exactSearch: true,
     };
+
+    function getSpecificStyles(selector) {
+        const styles = {};
+        for (const sheet of document.styleSheets) {
+            try {
+                for (const rule of sheet.cssRules) {
+                    if (rule.selectorText === selector) {
+                        for (let i = 0; i < rule.style.length; i++) {
+                            const property = rule.style[i];
+                            styles[property] = rule.style.getPropertyValue(property);
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore errors from accessing cross-origin stylesheets
+            }
+        }
+        return styles;
+    }
+
+    function copyStylesToClass(sourceSelector, targetClassName, skip = []) {
+        const styles = getSpecificStyles(sourceSelector);
+        let styleString = `.${targetClassName} {`;
+
+        for (const [property, value] of Object.entries(styles)) {
+            if (skip.includes(property)) continue;
+            styleString += `${property}: ${value}; `;
+        }
+
+        styleString += '}';
+
+        GM_addStyle(styleString);
+    }
 
     // IndexedDB Manager
     const IndexedDBManager = {
@@ -166,9 +200,9 @@
     function getImmersionKitData(vocab, exactSearch) {
         return new Promise(async (resolve, reject) => {
             const searchVocab = exactSearch ? `「${vocab}」` : vocab;
-            const url = `${CONFIG.API_HOST}/look_up_dictionary?keyword=${encodeURIComponent(
-                searchVocab
-            )}&sort=shortness&min_length=${CONFIG.MINIMUM_EXAMPLE_LENGTH}`;
+            const url = `${CONFIG.API_HOST}/look_up_dictionary?keyword=${encodeURIComponent(searchVocab)}&sort=shortness&min_length=${
+                CONFIG.MINIMUM_EXAMPLE_LENGTH
+            }`;
             try {
                 const db = await IndexedDBManager.open();
                 const cachedData = await IndexedDBManager.get(db, searchVocab);
@@ -708,13 +742,19 @@
         // Highlight vocabulary in the sentence based on configuration
         if (!CONFIG.COLORED_SENTENCE_TEXT) return sentence;
 
+        copyStylesToClass('.answer-box .sentence > .highlight', 'immkit-highlight', [
+            'margin-top',
+            'margin-bottom',
+            'margin-left',
+            'margin-right',
+        ]);
         if (state.exactSearch) {
             const regex = new RegExp(`(${vocab})`, 'g');
-            return sentence.replace(regex, '<span style="color: var(--outline-input-color);">$1</span>');
+            return sentence.replace(regex, '<span class="highlight immkit-highlight">$1</span>');
         } else {
             return vocab.split('').reduce((acc, char) => {
                 const regex = new RegExp(char, 'g');
-                return acc.replace(regex, `<span style="color: var(--outline-input-color);">${char}</span>`);
+                return acc.replace(regex, `<span class="highlight immkit-highlight">${char}</span>`);
             }, sentence);
         }
     }
