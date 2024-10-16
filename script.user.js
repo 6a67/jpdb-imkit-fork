@@ -24,7 +24,6 @@
         COLORED_SENTENCE_TEXT: true,
         AUTO_PLAY_SOUND: true,
         NUMBER_OF_PRELOADS: 1,
-        VOCAB_SIZE: '250%',
         MINIMUM_EXAMPLE_LENGTH: 0,
 
         // Setting the host for the API manually to allow
@@ -1092,7 +1091,6 @@
         } else {
             applyChanges(changes);
             finalizeSaveConfig();
-            setVocabSize();
         }
     }
 
@@ -1557,7 +1555,6 @@
         } else if (state.apiDataFetched) {
             embedImageAndPlayAudio();
             preloadImages();
-            setVocabSize();
         }
     }
 
@@ -1569,21 +1566,6 @@
         }
     });
 
-    // Function to apply styles
-    function setVocabSize() {
-        // Create a new style element
-        const style = document.createElement('style');
-        style.type = 'text/css';
-        style.innerHTML = `
-            .answer-box > .plain {
-                font-size: ${CONFIG.VOCAB_SIZE} !important; /* Use the configurable font size */
-                padding-bottom: 0.1rem !important; /* Retain padding */
-            }
-        `;
-
-        // Append the new style to the document head
-        document.head.appendChild(style);
-    }
     observer.lastUrl = window.location.href;
     observer.observe(document, { subtree: true, childList: true });
 
@@ -1594,6 +1576,5 @@
 
     // Initial configuration and preloading
     loadConfig();
-    setVocabSize();
     preloadImages();
 })();
