@@ -27,6 +27,11 @@
         NUMBER_OF_PRELOADS: 1,
         VOCAB_SIZE: '250%',
         MINIMUM_EXAMPLE_LENGTH: 0,
+
+        // Setting the host for the API manually to allow
+        // for a proxy that caches the responses and
+        // returns cold responses
+        API_HOST: 'https://api.immersionkit.com',
     };
 
     const state = {
@@ -163,7 +168,7 @@
     function getImmersionKitData(vocab, exactSearch) {
         return new Promise(async (resolve, reject) => {
             const searchVocab = exactSearch ? `「${vocab}」` : vocab;
-            const url = `https://api.immersionkit.com/look_up_dictionary?keyword=${encodeURIComponent(
+            const url = `${CONFIG.API_HOST}/look_up_dictionary?keyword=${encodeURIComponent(
                 searchVocab
             )}&sort=shortness&min_length=${CONFIG.MINIMUM_EXAMPLE_LENGTH}`;
             try {
