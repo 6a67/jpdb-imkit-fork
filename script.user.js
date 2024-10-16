@@ -17,7 +17,6 @@
     const CONFIG = {
         IMAGE_WIDTH: '400px',
         WIDE_MODE: true,
-        PAGE_WIDTH: '75rem',
         SOUND_VOLUME: 80,
         ENABLE_EXAMPLE_TRANSLATION: true,
         SENTENCE_FONT_SIZE: '120%',
@@ -1094,7 +1093,6 @@
             applyChanges(changes);
             finalizeSaveConfig();
             setVocabSize();
-            setPageWidth();
         }
     }
 
@@ -1560,13 +1558,7 @@
             embedImageAndPlayAudio();
             preloadImages();
             setVocabSize();
-            setPageWidth();
         }
-    }
-
-    function setPageWidth() {
-        // Set the maximum width of the page
-        document.body.style.maxWidth = CONFIG.PAGE_WIDTH;
     }
 
     // Observe URL changes and reload the page content accordingly
@@ -1602,7 +1594,6 @@
 
     // Initial configuration and preloading
     loadConfig();
-    setPageWidth();
     setVocabSize();
     preloadImages();
 })();
