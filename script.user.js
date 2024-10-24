@@ -289,7 +289,7 @@
     // PARSE VOCAB FUNCTIONS =====================================================================================================================
     function parseVocabFromAnswer() {
         // Select all links containing "/kanji/" or "/vocabulary/" in the href attribute
-        const elements = document.querySelectorAll('a[href*="/kanji/"], a[href*="/vocabulary/"]');
+        const elements = document.querySelectorAll('a.plain[href*="/kanji/"], a.plain[href*="/vocabulary/"]');
         console.log('Parsing Answer Page');
 
         // Iterate through the matched elements
@@ -1616,6 +1616,8 @@
         state.currentExampleIndex = index;
         state.exactSearch = exactState;
 
+        console.log(state)
+        
         // Fetch data and embed image/audio if necessary
         if (state.vocab && !state.apiDataFetched) {
             getImmersionKitData(state.vocab, state.exactSearch)
