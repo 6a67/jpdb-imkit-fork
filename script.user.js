@@ -311,10 +311,24 @@
         console.log('Parsing Review Page');
 
         // If kindElement doesn't exist, set kindText to ''
-        const kindText = kindElement ? kindElement.textContent.trim() : '';
+        let kindText = kindElement ? kindElement.textContent.trim() : '';
 
         // Accept 'Kanji', 'Vocabulary', or 'New' kindText
         // if (kindText !== 'Kanji' && kindText !== 'Vocabulary' && kindText !== 'New') return ''; // Return empty if it's neither kanji nor vocab
+        
+        // New code
+        // I am translating the user interface which is why this check fails for me
+        // Here I am testing for the hidden input element
+        // TODO: New Card detection
+        const hiddenInput = document.querySelector('input[type="hidden"][name="c"]');
+
+        const value = hiddenInput?.value;
+        if (value?.startsWith('kb,')) {
+            kindText = 'Kanji';
+        }
+        if (value?.startsWith('vf,')) {
+            kindText = 'Vocabulary';
+        }
 
         if (kindText === 'Vocabulary' || kindText === 'New') {
             // Select the element with class 'plain' to extract vocabulary
@@ -352,15 +366,6 @@
             }
         }
 
-        // New code
-        // I am translating the user interface which is why this check fails for me
-        // Here I am testing for the hidden input element
-        // TODO: New Card detection
-        const hiddenInput = document.querySelector('input[type="hidden"][name="c"]');
-
-        const value = hiddenInput?.value;
-        if (value?.startsWith('kb,')) return "Kanji";
-        if (value?.startsWith('vf,')) return "Vocabulary";
 
         return '';
     }
