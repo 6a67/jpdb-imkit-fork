@@ -16,7 +16,8 @@
     'use strict';
 
     const CONFIG = {
-        IMAGE_WIDTH: '400px',
+        // IMAGE_WIDTH: '400px',
+        IMAGE_HEIGHT: '200px',
         WIDE_MODE: true,
         SOUND_VOLUME: 80,
         ENABLE_EXAMPLE_TRANSLATION: true,
@@ -32,6 +33,8 @@
         // returns cold responses
         API_HOST: 'https://api.immersionkit.com',
     };
+
+    const EDITABLE_STRING_KEYS = new Set(['API_HOST']);
 
     const state = {
         currentExampleIndex: 0,
@@ -405,12 +408,12 @@
         return anchor;
     }
 
-    function createIcon(iconClass, fontSize = '1.4rem', color = '#3d81ff') {
+    function createIcon(iconClass, fontSize = '1.4rem', color = 'var(--link-color)') {
         // Create and style an icon element
         const icon = document.createElement('i');
         icon.className = iconClass;
         icon.style.fontSize = fontSize;
-        icon.style.opacity = '1.0';
+        icon.style.opacity = '0.7';
         icon.style.verticalAlign = 'baseline';
         icon.style.color = color;
         return icon;
@@ -446,7 +449,9 @@
 
         // Style the star icon
         starIcon.style.fontSize = '1.4rem';
-        starIcon.style.color = '#3D8DFF';
+        // starIcon.style.color = '#3D8DFF';
+        starIcon.style.color = 'var(--link-color)';
+        starIcon.style.opacity = '0.7';
         starIcon.style.verticalAlign = 'middle';
         starIcon.style.position = 'relative';
         starIcon.style.top = '-2px';
@@ -492,7 +497,9 @@
 
         // Style the quote icon
         quoteIcon.style.fontSize = '1.1rem';
-        quoteIcon.style.color = '#3D8DFF';
+        // quoteIcon.style.color = '#3D8DFF';
+        quoteIcon.style.color = 'var(--link-color)';
+        quoteIcon.style.opacity = '0.7';
         quoteIcon.style.verticalAlign = 'middle';
         quoteIcon.style.position = 'relative';
         quoteIcon.style.top = '0px';
@@ -538,7 +545,9 @@
 
         // Style the menu icon
         menuIcon.style.fontSize = '1.4rem';
-        menuIcon.style.color = '#3D8DFF';
+        // menuIcon.style.color = '#3D8DFF';
+        menuIcon.style.color = 'var(--link-color)';
+        menuIcon.style.opacity = '0.7';
         menuIcon.style.verticalAlign = 'middle';
         menuIcon.style.position = 'relative';
         menuIcon.style.top = '-2px';
@@ -723,6 +732,9 @@
         wrapperDiv.id = 'image-wrapper';
         wrapperDiv.style.textAlign = 'center';
         wrapperDiv.style.padding = '5px 0';
+        wrapperDiv.style.display = 'flex';
+        wrapperDiv.style.flexDirection = 'column';
+        wrapperDiv.style.alignItems = 'center';
         return wrapperDiv;
     }
 
@@ -734,7 +746,8 @@
             src: imageUrl,
             alt: 'Embedded Image',
             title: titleText,
-            style: `max-width: ${CONFIG.IMAGE_WIDTH}; margin-top: 10px; cursor: pointer;`,
+            // style: `max-width: ${CONFIG.IMAGE_WIDTH}; margin-top: 10px; cursor: pointer;`,
+            style: `max-height: ${CONFIG.IMAGE_HEIGHT}; margin-top: 10px; cursor: pointer;`,
         });
     }
 
@@ -766,8 +779,9 @@
         sentenceText.style.marginTop = '10px';
         sentenceText.style.fontSize = CONFIG.SENTENCE_FONT_SIZE;
         sentenceText.style.color = 'lightgray';
-        sentenceText.style.maxWidth = CONFIG.IMAGE_WIDTH;
+        sentenceText.style.maxWidth = CONFIG.IMAGE_HEIGHT;
         sentenceText.style.whiteSpace = 'pre-wrap';
+        sentenceText.style.textAlign = 'center'; // Center the text horizontally
         wrapperDiv.appendChild(sentenceText);
 
         if (CONFIG.ENABLE_EXAMPLE_TRANSLATION && translation) {
@@ -776,7 +790,8 @@
             translationText.style.marginTop = '5px';
             translationText.style.fontSize = CONFIG.TRANSLATION_FONT_SIZE;
             translationText.style.color = 'var(--subsection-label-color)';
-            translationText.style.maxWidth = CONFIG.IMAGE_WIDTH;
+            // translationText.style.maxWidth = CONFIG.IMAGE_WIDTH;
+            translationText.style.maxWidth = CONFIG.IMAGE_HEIGHT;
             translationText.style.whiteSpace = 'pre-wrap';
             wrapperDiv.appendChild(translationText);
         }
@@ -799,7 +814,8 @@
         navigationDiv.style.display = 'flex';
         navigationDiv.style.justifyContent = 'center';
         navigationDiv.style.alignItems = 'center';
-        navigationDiv.style.maxWidth = CONFIG.IMAGE_WIDTH;
+        // navigationDiv.style.maxWidth = CONFIG.IMAGE_WIDTH;
+        navigationDiv.style.maxWidth = CONFIG.IMAGE_HEIGHT;
         navigationDiv.style.margin = '0 auto';
         return navigationDiv;
     }
@@ -1137,34 +1153,40 @@
     function gatherChanges(inputs) {
         let minimumExampleLengthChanged = false;
         let newMinimumExampleLength;
+    
         const changes = {};
-
+    
         inputs.forEach((input) => {
             const key = input.getAttribute('data-key');
             const type = input.getAttribute('data-type');
+            const typePart = input.getAttribute('data-type-part');
+    
             let value;
-
+    
             if (type === 'boolean') {
                 value = input.checked;
             } else if (type === 'number') {
                 value = parseFloat(input.textContent);
             } else if (type === 'string') {
-                value = input.textContent;
+                if (typePart === 'editable') {
+                    // For editable text inputs, use the input's value directly
+                    value = input.value;
+                } else {
+                    // For formatted strings, append the unit
+                    value = `${input.textContent}${typePart}`;
+                }
             }
-
+    
             if (key && type) {
-                const typePart = input.getAttribute('data-type-part');
-                const originalFormattedType = typePart.slice(1, -1);
-
                 if (key === 'MINIMUM_EXAMPLE_LENGTH' && CONFIG.MINIMUM_EXAMPLE_LENGTH !== value) {
                     minimumExampleLengthChanged = true;
                     newMinimumExampleLength = value;
                 }
-
-                changes[`CONFIG.${key}`] = value + originalFormattedType;
+    
+                changes[`CONFIG.${key}`] = value;
             }
         });
-
+    
         return { changes, minimumExampleLengthChanged, newMinimumExampleLength };
     }
 
@@ -1427,57 +1449,53 @@
                 // Initialize button states
                 updateButtonStates();
             } else if (typeof value === 'string') {
-                const typeParts = value.split(/(\d+)/).filter(Boolean);
-                const numberParts = typeParts.filter((part) => !isNaN(part)).map(Number);
-
-                const numberContainer = document.createElement('div');
-                numberContainer.style.display = 'flex';
-                numberContainer.style.alignItems = 'center';
-                numberContainer.style.justifyContent = 'center';
-
-                const typeSpan = document.createElement('span');
-                const formattedType =
-                    '(' +
-                    typeParts
-                        .filter((part) => isNaN(part))
-                        .join('')
-                        .replace(/_/g, ' ')
-                        .toLowerCase() +
-                    ')';
-                typeSpan.textContent = formattedType;
-                typeSpan.style.marginRight = '10px';
-
-                leftContainer.appendChild(typeSpan);
-
-                typeParts.forEach((part) => {
-                    if (!isNaN(part)) {
+                if (EDITABLE_STRING_KEYS.has(key)) {
+                    // Render a text input for editable string keys
+                    const textInput = document.createElement('input');
+                    textInput.type = 'text';
+                    textInput.value = value;
+                    textInput.style.margin = '0 10px';
+                    textInput.style.minWidth = '150px';
+                    textInput.style.textAlign = 'center';
+                    textInput.setAttribute('data-key', key);
+                    textInput.setAttribute('data-type', 'string');
+                    textInput.setAttribute('data-type-part', 'editable');
+    
+                    rightContainer.appendChild(textInput);
+                } else {
+                    // Existing handling for formatted strings (e.g., "400px")
+                    const typeParts = value.split(/(\d+)/).filter(Boolean);
+                    const numberParts = typeParts.filter((part) => !isNaN(part)).map(Number);
+                    const numberContainer = document.createElement('div');
+                    numberContainer.style.display = 'flex';
+                    numberContainer.style.alignItems = 'center';
+                    numberContainer.style.justifyContent = 'center';
+    
+                    if (numberParts.length > 0) {
+                        // Existing number-like string handling with +/- buttons
                         const decrementButton = document.createElement('button');
                         decrementButton.textContent = '-';
                         decrementButton.style.marginRight = '5px';
-
+    
                         const input = document.createElement('span');
-                        input.textContent = part;
+                        input.textContent = numberParts[0];
                         input.style.margin = '0 10px';
                         input.style.minWidth = '3ch';
                         input.style.textAlign = 'center';
                         input.setAttribute('data-key', key);
                         input.setAttribute('data-type', 'string');
-                        input.setAttribute('data-type-part', formattedType);
-
+                        input.setAttribute('data-type-part', typeParts.slice(1).join(''));
+    
                         const incrementButton = document.createElement('button');
                         incrementButton.textContent = '+';
                         incrementButton.style.marginLeft = '5px';
-
+    
                         const updateButtonStates = () => {
                             let currentValue = parseFloat(input.textContent);
-                            if (currentValue <= 0) {
-                                decrementButton.disabled = true;
-                                decrementButton.style.color = 'grey';
-                            } else {
-                                decrementButton.disabled = false;
-                                decrementButton.style.color = '';
-                            }
-                            if (key === 'SOUND_VOLUME' && currentValue >= 100) {
+                            decrementButton.disabled = currentValue <= 0;
+                            decrementButton.style.color = currentValue <= 0 ? 'grey' : '';
+    
+                            if (typeParts.slice(1).join('') === 'px' && currentValue >= 1000) {
                                 incrementButton.disabled = true;
                                 incrementButton.style.color = 'grey';
                             } else {
@@ -1485,46 +1503,46 @@
                                 incrementButton.style.color = '';
                             }
                         };
-
+    
                         decrementButton.addEventListener('click', () => {
                             let currentValue = parseFloat(input.textContent);
                             if (currentValue > 0) {
-                                if (currentValue > 200) {
-                                    input.textContent = currentValue - 25;
-                                } else if (currentValue > 20) {
-                                    input.textContent = currentValue - 5;
-                                } else {
-                                    input.textContent = currentValue - 1;
-                                }
+                                input.textContent = currentValue - 10;
                                 updateButtonStates();
                             }
                         });
-
+    
                         incrementButton.addEventListener('click', () => {
                             let currentValue = parseFloat(input.textContent);
-                            if (key === 'SOUND_VOLUME' && currentValue >= 100) {
-                                return;
+                            if (!(typeParts.slice(1).join('') === 'px' && currentValue >= 1000)) {
+                                input.textContent = currentValue + 10;
+                                updateButtonStates();
                             }
-                            if (currentValue >= 200) {
-                                input.textContent = currentValue + 25;
-                            } else if (currentValue >= 20) {
-                                input.textContent = currentValue + 5;
-                            } else {
-                                input.textContent = currentValue + 1;
-                            }
-                            updateButtonStates();
                         });
-
+    
                         numberContainer.appendChild(decrementButton);
                         numberContainer.appendChild(input);
                         numberContainer.appendChild(incrementButton);
-
-                        // Initialize button states
+    
                         updateButtonStates();
+    
+                        rightContainer.appendChild(numberContainer);
+                    } else {
+                        // If the string doesn't contain numbers, treat it as a pure string
+                        const textInput = document.createElement('input');
+                        textInput.type = 'text';
+                        textInput.value = value;
+                        textInput.style.margin = '0 10px';
+                        textInput.style.minWidth = '150px';
+                        textInput.style.textAlign = 'center';
+                        textInput.setAttribute('data-key', key);
+                        textInput.setAttribute('data-type', 'string');
+                        textInput.setAttribute('data-type-part', 'editable');
+    
+                        rightContainer.appendChild(textInput);
                     }
-                });
+                }
 
-                rightContainer.appendChild(numberContainer);
             }
 
             optionContainer.appendChild(leftContainer);
