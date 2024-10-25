@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.3
+// @version      0.1.4
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -786,6 +786,8 @@
         return imageElement;
     }
 
+    // TODO: Highlight not working for partial matches
+    //       - sentence has "二人" and vocab is "二", nothing is highlighted
     function highlightVocab(sentence, vocab) {
         const div = document.createElement('div');
 
