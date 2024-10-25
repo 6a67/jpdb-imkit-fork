@@ -795,7 +795,7 @@
         sentenceText.style.marginTop = '10px';
         sentenceText.style.fontSize = CONFIG.SENTENCE_FONT_SIZE;
         sentenceText.style.color = 'lightgray';
-        sentenceText.style.maxWidth = CONFIG.IMAGE_HEIGHT;
+        sentenceText.style.maxWidth = '100%';
         sentenceText.style.whiteSpace = 'pre-wrap';
         sentenceText.style.textAlign = 'center'; // Center the text horizontally
         wrapperDiv.appendChild(sentenceText);
@@ -807,7 +807,7 @@
             translationText.style.fontSize = CONFIG.TRANSLATION_FONT_SIZE;
             translationText.style.color = 'var(--subsection-label-color)';
             // translationText.style.maxWidth = CONFIG.IMAGE_WIDTH;
-            translationText.style.maxWidth = CONFIG.IMAGE_HEIGHT;
+            translationText.style.maxWidth = '100%';
             translationText.style.whiteSpace = 'pre-wrap';
             wrapperDiv.appendChild(translationText);
         }
@@ -831,7 +831,6 @@
         navigationDiv.style.justifyContent = 'center';
         navigationDiv.style.alignItems = 'center';
         // navigationDiv.style.maxWidth = CONFIG.IMAGE_WIDTH;
-        navigationDiv.style.maxWidth = CONFIG.IMAGE_HEIGHT;
         navigationDiv.style.margin = '0 auto';
         return navigationDiv;
     }
@@ -1617,7 +1616,7 @@
         state.exactSearch = exactState;
 
         console.log(state)
-        
+
         // Fetch data and embed image/audio if necessary
         if (state.vocab && !state.apiDataFetched) {
             getImmersionKitData(state.vocab, state.exactSearch)
