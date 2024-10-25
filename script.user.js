@@ -9,6 +9,7 @@
 // @grant        GM_addElement
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
+// @updateURL    https://raw.githubusercontent.com/6a67/jpdb-imkit-fork/main/script.user.js
 // @license      MIT
 // ==/UserScript==
 
