@@ -24,7 +24,9 @@
         SENTENCE_FONT_SIZE: '120%',
         TRANSLATION_FONT_SIZE: '85%',
         COLORED_SENTENCE_TEXT: true,
-        AUTO_PLAY_SOUND: true,
+        // AUTO_PLAY_SOUND: true,
+        AUTO_PLAY_ON_REVEAL: false,
+        AUTO_PLAY_ON_CHANGE: true,
         NUMBER_OF_PRELOADS: 1,
         MINIMUM_EXAMPLE_LENGTH: 0,
         SHOW_FURIGANA: true,
@@ -712,15 +714,15 @@
 
         // Create navigation elements
         const navigationDiv = createNavigationDiv();
-        const leftArrow = createLeftArrow(vocab, shouldAutoPlaySound);
-        const rightArrow = createRightArrow(vocab, shouldAutoPlaySound);
+        const leftArrow = createLeftArrow(vocab, CONFIG.AUTO_PLAY_ON_CHANGE);
+        const rightArrow = createRightArrow(vocab, CONFIG.AUTO_PLAY_ON_CHANGE);
 
         // Create and append the main container
         const containerDiv = createContainerDiv(leftArrow, wrapperDiv, rightArrow, navigationDiv);
         appendContainer(containerDiv);
 
         // Auto-play sound if configured
-        if (CONFIG.AUTO_PLAY_SOUND && shouldAutoPlaySound) {
+        if (shouldAutoPlaySound) {
             playAudio(soundUrl);
         }
     }
@@ -768,8 +770,13 @@
     }
 
     function highlightVocab(sentence, vocab) {
+        const div = document.createElement('div');
+
         // Highlight vocabulary in the sentence based on configuration
-        if (!CONFIG.COLORED_SENTENCE_TEXT) return sentence;
+        if (!CONFIG.COLORED_SENTENCE_TEXT) {
+            div.textContent = sentence;
+            return div;
+        }
 
         copyStylesToClass('.answer-box .sentence > .highlight', 'immkit-highlight', [
             'margin-top',
@@ -878,7 +885,7 @@
             innerHTML += text;
         }
 
-        const div = document.createElement('div');
+
         div.innerHTML = innerHTML;
         return div;
     }
@@ -1050,7 +1057,7 @@
 
         const reviewUrlPattern = /https:\/\/jpdb\.io\/review(#a)?$/;
 
-        renderImageAndPlayAudio(state.vocab, !reviewUrlPattern.test(window.location.href));
+        renderImageAndPlayAudio(state.vocab, !reviewUrlPattern.test(window.location.href) && CONFIG.AUTO_PLAY_ON_REVEAL);
         preloadImages();
     }
 
@@ -1337,7 +1344,7 @@
 
     function finalizeSaveConfig() {
         loadConfig();
-        renderImageAndPlayAudio(state.vocab, CONFIG.AUTO_PLAY_SOUND);
+        renderImageAndPlayAudio(state.vocab, CONFIG.AUTO_PLAY_ON_REVEAL);
         const overlay = document.getElementById('overlayMenu');
         if (overlay) {
             document.body.removeChild(overlay);
