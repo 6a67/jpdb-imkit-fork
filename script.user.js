@@ -34,6 +34,8 @@
         // Setting the host for the API manually to allow
         // for a proxy that caches the responses and
         // returns cold responses
+
+        // Not needed anymore as the preload is fixed
         API_HOST: 'https://api.immersionkit.com',
     };
 
