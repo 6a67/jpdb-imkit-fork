@@ -757,16 +757,30 @@
     }
 
     function createImageElement(wrapperDiv, imageUrl, vocab, exactSearch) {
+        // Create a container for the image
+        const imageContainer = document.createElement('div');
+
+        imageContainer.style.aspectRatio = '16 / 9';
+        imageContainer.style.width = '100%';
+        imageContainer.style.display = 'flex';
+        imageContainer.style.justifyContent = 'center';
+        imageContainer.style.alignItems = 'center';
+        imageContainer.style.maxHeight = CONFIG.IMAGE_HEIGHT;
+
         // Create and return an image element with specified attributes
         const searchVocab = exactSearch ? `「${vocab}」` : vocab;
         const titleText = `${searchVocab} #${state.currentExampleIndex + 1} \n${state.examples[state.currentExampleIndex].deck_name}`;
-        return GM_addElement(wrapperDiv, 'img', {
+        const imageElement = GM_addElement(imageContainer, 'img', {
             src: imageUrl,
             alt: 'Embedded Image',
             title: titleText,
-            // style: `max-width: ${CONFIG.IMAGE_WIDTH}; margin-top: 10px; cursor: pointer;`,
-            style: `max-height: ${CONFIG.IMAGE_HEIGHT}; margin-top: 10px; cursor: pointer;`,
+            style: `height: 100%; max-width: 100%; object-fit: contain; cursor: pointer;`,
         });
+
+        // Append the image container to the wrapper div
+        wrapperDiv.appendChild(imageContainer);
+
+        return imageElement;
     }
 
     function highlightVocab(sentence, vocab) {
