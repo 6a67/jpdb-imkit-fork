@@ -806,8 +806,6 @@
 
             const nonFuriganaSection = match[4] || '';
 
-            console.log(kanji, furigana, after, nonFuriganaSection);
-
             if (kanji) {
                 fragments.push(new TextFragment(kanji, furigana, false));
             }
@@ -864,7 +862,6 @@
                 }
             }
         });
-        console.log(fragments);
 
         let innerHTML = '';
         let wasHighlighted = false;
@@ -1714,8 +1711,6 @@
         const { index, exactState } = getStoredData(state.vocab);
         state.currentExampleIndex = index;
         state.exactSearch = exactState;
-
-        console.log(state);
 
         // Fetch data and embed image/audio if necessary
         if (state.vocab && !state.apiDataFetched) {
