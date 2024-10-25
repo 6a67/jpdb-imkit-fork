@@ -27,6 +27,7 @@
         AUTO_PLAY_SOUND: true,
         NUMBER_OF_PRELOADS: 1,
         MINIMUM_EXAMPLE_LENGTH: 0,
+        SHOW_FURIGANA: true,
 
         // Setting the host for the API manually to allow
         // for a proxy that caches the responses and
@@ -315,7 +316,7 @@
 
         // Accept 'Kanji', 'Vocabulary', or 'New' kindText
         // if (kindText !== 'Kanji' && kindText !== 'Vocabulary' && kindText !== 'New') return ''; // Return empty if it's neither kanji nor vocab
-        
+
         // New code
         // I am translating the user interface which is why this check fails for me
         // Here I am testing for the hidden input element
@@ -365,7 +366,6 @@
                 return vocab;
             }
         }
-
 
         return '';
     }
@@ -683,7 +683,7 @@
         const example = state.examples[state.currentExampleIndex] || {};
         const imageUrl = example.image_url || null;
         const soundUrl = example.sound_url || null;
-        const sentence = example.sentence || null;
+        const sentence = (CONFIG.SHOW_FURIGANA ? example.sentence_with_furigana : example.sentence) || null;
 
         // Remove any existing container
         removeExistingContainer();
@@ -777,21 +777,115 @@
             'margin-left',
             'margin-right',
         ]);
-        if (state.exactSearch) {
-            const regex = new RegExp(`(${vocab})`, 'g');
-            return sentence.replace(regex, '<span class="highlight immkit-highlight">$1</span>');
-        } else {
-            return vocab.split('').reduce((acc, char) => {
-                const regex = new RegExp(char, 'g');
-                return acc.replace(regex, `<span class="highlight immkit-highlight">${char}</span>`);
-            }, sentence);
+
+        class TextFragment {
+            constructor(text, furigana, isHighlighted) {
+                this.text = text;
+                this.furigana = furigana;
+                this.isHighlighted = isHighlighted;
+            }
         }
+
+        // ([^ ]+)\[([^ ]+)\]([^ ]*) ?
+        const regex = /([^ ]+)\[([^ ]+)\]([^ ]*) ?|([^ ]+) ?/g;
+        const fragments = [];
+        let match;
+        let lastIndex = 0;
+
+        while ((match = regex.exec(sentence)) !== null) {
+            const kanji = match[1] || '';
+            const furigana = match[2] || '';
+            const after = match[3] || '';
+
+            const nonFuriganaSection = match[4] || '';
+
+            console.log(kanji, furigana, after, nonFuriganaSection);
+
+            if (kanji) {
+                fragments.push(new TextFragment(kanji, furigana, false));
+            }
+
+            if (after) {
+                for (const char of after) {
+                    fragments.push(new TextFragment(char, '', false));
+                }
+            }
+
+            if (nonFuriganaSection) {
+                for (const char of nonFuriganaSection) {
+                    fragments.push(new TextFragment(char, '', false));
+                }
+            }
+
+            lastIndex = regex.lastIndex;
+        }
+
+        if (lastIndex < sentence.length) {
+            const lastText = sentence.slice(lastIndex);
+            for (const char of lastText) {
+                fragments.push(new TextFragment(char, '', false));
+            }
+        }
+
+        ///
+        const vocabArray = typeof vocab === 'string' ? [vocab] : vocab;
+
+        // For each vocab word, try to find matching sequences of fragments
+        vocabArray.forEach((word) => {
+            // Check each possible starting position
+            for (let i = 0; i < fragments.length; i++) {
+                let concatenated = '';
+                let j = i;
+
+                // Build up concatenated text from consecutive fragments
+                while (j < fragments.length) {
+                    concatenated += fragments[j].text;
+
+                    // If we've found a match
+                    if (concatenated === word) {
+                        // Mark all fragments in the matching sequence as highlighted
+                        for (let k = i; k <= j; k++) {
+                            fragments[k].isHighlighted = true;
+                        }
+                        break;
+                    }
+                    // If we've exceeded the word length, no point continuing
+                    if (concatenated.length >= word.length) {
+                        break;
+                    }
+                    j++;
+                }
+            }
+        });
+        console.log(fragments);
+
+        let innerHTML = '';
+        let wasHighlighted = false;
+
+        for (const fragment of fragments) {
+            const text = fragment.furigana ? `<ruby>${fragment.text}<rt>${fragment.furigana}</rt></ruby>` : fragment.text;
+
+            if (!wasHighlighted && fragment.isHighlighted) {
+                innerHTML += '<span class="highlight immkit-highlight">';
+                wasHighlighted = true;
+            }
+
+            if (wasHighlighted && !fragment.isHighlighted) {
+                innerHTML += '</span>';
+                wasHighlighted = false;
+            }
+
+            innerHTML += text;
+        }
+
+        const div = document.createElement('div');
+        div.innerHTML = innerHTML;
+        return div;
     }
 
     function appendSentenceAndTranslation(wrapperDiv, sentence, translation) {
         // Append sentence and translation to the wrapper div
-        const sentenceText = document.createElement('div');
-        sentenceText.innerHTML = highlightVocab(sentence, state.vocab);
+        const sentenceText = highlightVocab(sentence, state.vocab);
         sentenceText.style.marginTop = '10px';
         sentenceText.style.fontSize = CONFIG.SENTENCE_FONT_SIZE;
         sentenceText.style.color = 'lightgray';
@@ -1168,16 +1262,16 @@
     function gatherChanges(inputs) {
         let minimumExampleLengthChanged = false;
         let newMinimumExampleLength;
-    
+
         const changes = {};
-    
+
         inputs.forEach((input) => {
             const key = input.getAttribute('data-key');
             const type = input.getAttribute('data-type');
             const typePart = input.getAttribute('data-type-part');
-    
+
             let value;
-    
+
             if (type === 'boolean') {
                 value = input.checked;
             } else if (type === 'number') {
@@ -1191,17 +1285,17 @@
                     value = `${input.textContent}${typePart}`;
                 }
             }
-    
+
             if (key && type) {
                 if (key === 'MINIMUM_EXAMPLE_LENGTH' && CONFIG.MINIMUM_EXAMPLE_LENGTH !== value) {
                     minimumExampleLengthChanged = true;
                     newMinimumExampleLength = value;
                 }
-    
+
                 changes[`CONFIG.${key}`] = value;
             }
         });
-    
+
         return { changes, minimumExampleLengthChanged, newMinimumExampleLength };
     }
 
@@ -1475,7 +1569,7 @@
                     textInput.setAttribute('data-key', key);
                     textInput.setAttribute('data-type', 'string');
                     textInput.setAttribute('data-type-part', 'editable');
-    
+
                     rightContainer.appendChild(textInput);
                 } else {
                     // Existing handling for formatted strings (e.g., "400px")
@@ -1485,13 +1579,13 @@
                     numberContainer.style.display = 'flex';
                     numberContainer.style.alignItems = 'center';
                     numberContainer.style.justifyContent = 'center';
-    
+
                     if (numberParts.length > 0) {
                         // Existing number-like string handling with +/- buttons
                         const decrementButton = document.createElement('button');
                         decrementButton.textContent = '-';
                         decrementButton.style.marginRight = '5px';
-    
+
                         const input = document.createElement('span');
                         input.textContent = numberParts[0];
                         input.style.margin = '0 10px';
@@ -1500,16 +1594,16 @@
                         input.setAttribute('data-key', key);
                         input.setAttribute('data-type', 'string');
                         input.setAttribute('data-type-part', typeParts.slice(1).join(''));
-    
+
                         const incrementButton = document.createElement('button');
                         incrementButton.textContent = '+';
                         incrementButton.style.marginLeft = '5px';
-    
+
                         const updateButtonStates = () => {
                             let currentValue = parseFloat(input.textContent);
                             decrementButton.disabled = currentValue <= 0;
                             decrementButton.style.color = currentValue <= 0 ? 'grey' : '';
-    
+
                             if (typeParts.slice(1).join('') === 'px' && currentValue >= 1000) {
                                 incrementButton.disabled = true;
                                 incrementButton.style.color = 'grey';
@@ -1518,7 +1612,7 @@
                                 incrementButton.style.color = '';
                             }
                         };
-    
+
                         decrementButton.addEventListener('click', () => {
                             let currentValue = parseFloat(input.textContent);
                             if (currentValue > 0) {
@@ -1526,7 +1620,7 @@
                                 updateButtonStates();
                             }
                         });
-    
+
                         incrementButton.addEventListener('click', () => {
                             let currentValue = parseFloat(input.textContent);
                             if (!(typeParts.slice(1).join('') === 'px' && currentValue >= 1000)) {
@@ -1534,13 +1628,13 @@
                                 updateButtonStates();
                             }
                         });
-    
+
                         numberContainer.appendChild(decrementButton);
                         numberContainer.appendChild(input);
                         numberContainer.appendChild(incrementButton);
-    
+
                         updateButtonStates();
-    
+
                         rightContainer.appendChild(numberContainer);
                     } else {
                         // If the string doesn't contain numbers, treat it as a pure string
@@ -1553,11 +1647,10 @@
                         textInput.setAttribute('data-key', key);
                         textInput.setAttribute('data-type', 'string');
                         textInput.setAttribute('data-type-part', 'editable');
-    
+
                         rightContainer.appendChild(textInput);
                     }
                 }
-
             }
 
             optionContainer.appendChild(leftContainer);
@@ -1615,7 +1708,7 @@
         state.currentExampleIndex = index;
         state.exactSearch = exactState;
 
-        console.log(state)
+        console.log(state);
 
         // Fetch data and embed image/audio if necessary
         if (state.vocab && !state.apiDataFetched) {
