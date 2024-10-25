@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.2
+// @version      0.1.3
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
