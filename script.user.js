@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.6
+// @version      0.1.7
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -968,7 +968,7 @@
         let wasHighlighted = false;
 
         for (const fragment of fragments) {
-            const text = fragment.furigana ? `<ruby>${fragment.text}<rt>${fragment.furigana}</rt></ruby>` : fragment.text;
+            let text = fragment.furigana ? `<ruby>${fragment.text}<rt>${fragment.furigana}</rt></ruby>` : fragment.text;
 
             if (!wasHighlighted && fragment.isHighlighted) {
                 innerHTML += '<span class="highlight immkit-highlight">';
@@ -980,10 +980,30 @@
                 wasHighlighted = false;
             }
 
+            // Partial fix for the TODO above
+            if (!fragment.isHighlighted) {
+                let index = text.indexOf(vocab);
+                const highlightStart = '<span class="highlight immkit-highlight">';
+                const highlightEnd = '</span>';
+                const offset = highlightStart.length + highlightEnd.length;
+                
+                while (index !== -1) {
+                    text = text.substring(0, index) + 
+                           highlightStart + 
+                           text.substring(index, index + vocab.length) + 
+                           highlightEnd + 
+                           text.substring(index + vocab.length);
+                    
+                    // Move index past the current highlight plus the HTML tags
+                    index = text.indexOf(vocab, index + vocab.length + offset);
+                }
+            }
+
             innerHTML += text;
         }
 
         div.innerHTML = innerHTML;
+
         return div;
     }
 
