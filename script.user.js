@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.5
+// @version      0.1.6
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -31,6 +31,8 @@
         NUMBER_OF_PRELOADS: 1,
         MINIMUM_EXAMPLE_LENGTH: 0,
         SHOW_FURIGANA: true,
+        PREFERRED_DECK_NAMES: '',
+        NUMBER_OF_PREFERRED_EXAMPLES: 10,
 
         // Setting the host for the API manually to allow
         // for a proxy that caches the responses and
@@ -40,7 +42,7 @@
         API_HOST: 'https://api.immersionkit.com',
     };
 
-    const EDITABLE_STRING_KEYS = new Set(['API_HOST']);
+    const EDITABLE_STRING_KEYS = new Set(['API_HOST', 'PREFERRED_DECK_NAMES']);
 
     const state = {
         currentExampleIndex: 0,
@@ -114,6 +116,29 @@
             list.unshift(element);
         }
         return list;
+    }
+
+    function sortPreferredDecksFirst(examples) {
+        const preferredDeckNames = CONFIG.PREFERRED_DECK_NAMES.split(',').map((deckName) => deckName.trim());
+
+        if (!preferredDeckNames.length) {
+            return examples;
+        }
+
+        const preferredExamples = [];
+        const otherExamples = [];
+
+        for (const example of examples) {
+            if (preferredExamples.length < CONFIG.NUMBER_OF_PREFERRED_EXAMPLES && preferredDeckNames.includes(example.deck_name)) {
+                preferredExamples.push(example);
+            } else {
+                otherExamples.push(example);
+            }
+        }
+
+        console.log(preferredExamples);
+
+        return [...preferredExamples, ...otherExamples];
     }
 
     // IndexedDB Manager
@@ -252,8 +277,8 @@
                     state.examples.forEach((example, index) => {
                         example.originalIndex = index;
                     });
-                    console.log(state.examples);
                     state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.01) + 1);
+                    state.examples = sortPreferredDecksFirst(state.examples);
                     state.apiDataFetched = true;
                     resolve();
                 } else {
@@ -272,6 +297,7 @@
                                         example.originalIndex = index;
                                     });
                                     state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.01) + 1);
+                                    state.examples = sortPreferredDecksFirst(state.examples);
                                     state.apiDataFetched = true;
                                     await IndexedDBManager.save(db, searchVocab, jsonData);
                                     resolve();
