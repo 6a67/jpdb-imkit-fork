@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.7
+// @version      0.1.8
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -135,8 +135,6 @@
                 otherExamples.push(example);
             }
         }
-
-        console.log(preferredExamples);
 
         return [...preferredExamples, ...otherExamples];
     }
@@ -277,7 +275,7 @@
                     state.examples.forEach((example, index) => {
                         example.originalIndex = index;
                     });
-                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.01) + 1);
+                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.04) + 1);
                     state.examples = sortPreferredDecksFirst(state.examples);
                     state.apiDataFetched = true;
                     resolve();
@@ -296,7 +294,7 @@
                                     state.examples.forEach((example, index) => {
                                         example.originalIndex = index;
                                     });
-                                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.01) + 1);
+                                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.04) + 1);
                                     state.examples = sortPreferredDecksFirst(state.examples);
                                     state.apiDataFetched = true;
                                     await IndexedDBManager.save(db, searchVocab, jsonData);
