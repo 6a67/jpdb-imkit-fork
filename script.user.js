@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.4
+// @version      0.1.5
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -84,6 +84,36 @@
         styleString += '}';
 
         GM_addStyle(styleString);
+    }
+
+    function shuffleWithinRange(array, range = 7) {
+        let result = [...array];
+
+        for (let i = 0; i < result.length; i++) {
+            const shift = Math.floor(Math.random() * (2 * range + 1)) - range;
+            let newPos = i + shift;
+            newPos = Math.max(0, Math.min(newPos, result.length - 1));
+            if (newPos !== i) {
+                const element = result.splice(i, 1)[0];
+                result.splice(newPos, 0, element);
+            }
+        }
+
+        return result;
+    }
+
+    function getElementByOriginalIndex(originalIndex) {
+        return state.examples.find((element) => element.originalIndex === originalIndex);
+    }
+
+    function moveToFront(list, element) {
+        const index = list.indexOf(element);
+
+        if (index > -1) {
+            list.splice(index, 1);
+            list.unshift(element);
+        }
+        return list;
     }
 
     // IndexedDB Manager
@@ -218,6 +248,12 @@
                 if (cachedData && cachedData.data && Array.isArray(cachedData.data) && cachedData.data.length > 0) {
                     console.log('Data retrieved from IndexedDB');
                     state.examples = cachedData.data[0].examples;
+                    // add to each example its original index
+                    state.examples.forEach((example, index) => {
+                        example.originalIndex = index;
+                    });
+                    console.log(state.examples);
+                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.01) + 1);
                     state.apiDataFetched = true;
                     resolve();
                 } else {
@@ -232,6 +268,10 @@
                                 console.log(url);
                                 if (validateApiResponse(jsonData)) {
                                     state.examples = jsonData.data[0].examples;
+                                    state.examples.forEach((example, index) => {
+                                        example.originalIndex = index;
+                                    });
+                                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.01) + 1);
                                     state.apiDataFetched = true;
                                     await IndexedDBManager.save(db, searchVocab, jsonData);
                                     resolve();
@@ -281,7 +321,7 @@
         }
 
         // Return default values if no stored value exists
-        return { index: 0, exactState: state.exactSearch };
+        return { index: -1, exactState: state.exactSearch };
     }
 
     function storeData(key, index, exactState) {
@@ -465,7 +505,8 @@
             const [storedIndex, storedExactState] = storedValue.split(',');
             const index = parseInt(storedIndex, 10);
             const exactState = storedExactState === '1';
-            starIcon.textContent = state.currentExampleIndex === index && state.exactSearch === exactState ? '★' : '☆';
+            starIcon.textContent =
+                state.examples[state.currentExampleIndex].originalIndex === index && state.exactSearch === exactState ? '★' : '☆';
         }
 
         // Style the star icon
@@ -491,19 +532,21 @@
         // Toggle the star state between filled and empty
         const storedValue = localStorage.getItem(state.vocab);
 
+        const originalIndex = state.examples[state.currentExampleIndex].originalIndex;
+
         if (storedValue) {
             const [storedIndex, storedExactState] = storedValue.split(',');
             const index = parseInt(storedIndex, 10);
             const exactState = storedExactState === '1';
-            if (index === state.currentExampleIndex && exactState === state.exactSearch) {
+            if (index === originalIndex && exactState === state.exactSearch) {
                 localStorage.removeItem(state.vocab);
                 starIcon.textContent = '☆';
             } else {
-                localStorage.setItem(state.vocab, `${state.currentExampleIndex},${state.exactSearch ? 1 : 0}`);
+                localStorage.setItem(state.vocab, `${originalIndex},${state.exactSearch ? 1 : 0}`);
                 starIcon.textContent = '★';
             }
         } else {
-            localStorage.setItem(state.vocab, `${state.currentExampleIndex},${state.exactSearch ? 1 : 0}`);
+            localStorage.setItem(state.vocab, `${originalIndex},${state.exactSearch ? 1 : 0}`);
             starIcon.textContent = '★';
         }
     }
@@ -543,7 +586,15 @@
         // Update state based on stored data
         const storedData = getStoredData(state.vocab);
         if (storedData && storedData.exactState === state.exactSearch) {
-            state.currentExampleIndex = storedData.index;
+            // TODO: Not quite sure what this does
+            // state.currentExampleIndex = storedData.index;
+
+            // const element = getElementByOriginalIndex(storedData.index);
+            // if (element) {
+            //     state.currentExampleIndex = state.examples.indexOf(element);
+            // }
+
+            state.currentExampleIndex = 0;
         } else {
             state.currentExampleIndex = 0;
         }
@@ -551,6 +602,11 @@
         state.apiDataFetched = false;
         getImmersionKitData(state.vocab, state.exactSearch)
             .then(() => {
+                if (storedData.index >= 0 && storedData.exactState === state.exactSearch) {
+                    const element = getElementByOriginalIndex(storedData.index);
+                    moveToFront(state.examples, element);
+                }
+
                 embedImageAndPlayAudio();
             })
             .catch((error) => {
@@ -900,7 +956,6 @@
 
             innerHTML += text;
         }
-
 
         div.innerHTML = innerHTML;
         return div;
@@ -1727,14 +1782,20 @@
         }
 
         // Retrieve stored data for the current vocabulary
-        const { index, exactState } = getStoredData(state.vocab);
-        state.currentExampleIndex = index;
+        const { index, exactState } = getStoredData(state.vocab); // This is the data for the favorite entry
+        // state.currentExampleIndex = index;
+        state.currentExampleIndex = 0;
         state.exactSearch = exactState;
 
         // Fetch data and embed image/audio if necessary
         if (state.vocab && !state.apiDataFetched) {
             getImmersionKitData(state.vocab, state.exactSearch)
                 .then(() => {
+                    if (index >= 0) {
+                        const favoriteEntry = getElementByOriginalIndex(index);
+                        moveToFront(state.examples, favoriteEntry);
+                    }
+
                     preloadImages();
                     if (!/https:\/\/jpdb\.io\/review(#a)?$/.test(url)) {
                         embedImageAndPlayAudio();
@@ -1742,6 +1803,11 @@
                 })
                 .catch(console.error);
         } else if (state.apiDataFetched) {
+            if (index >= 0) {
+                const favoriteEntry = getElementByOriginalIndex(index);
+                moveToFront(state.examples, favoriteEntry);
+            }
+
             embedImageAndPlayAudio();
             preloadImages();
         }
