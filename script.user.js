@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.9
+// @version      0.1.10
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -420,16 +420,13 @@
             }
 
             let vocabulary = plainElement.textContent.trim();
-            const nestedVocabularyElement = plainElement.querySelector('div:not([style])');
 
-            if (nestedVocabularyElement) {
-                vocabulary = nestedVocabularyElement.textContent.trim();
-            }
-            const specificVocabularyElement = plainElement.querySelector('div:nth-child(3)');
-
-            if (specificVocabularyElement) {
-                vocabulary = specificVocabularyElement.textContent.trim();
-            }
+            const plainPlainElement = plainElement.querySelector('.plain')?.cloneNode(true);
+            if (plainPlainElement) {
+                // Remove furigana
+                plainPlainElement.querySelectorAll('rt').forEach((rt) => rt.remove());
+                vocabulary = plainPlainElement.textContent.trim();
+            } 
 
             // Regular expression to check if the vocabulary contains kanji characters
             const kanjiRegex = /[\u4e00-\u9faf\u3400-\u4dbf]/;
