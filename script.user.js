@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.8
+// @version      0.1.9
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -33,6 +33,12 @@
         SHOW_FURIGANA: true,
         PREFERRED_DECK_NAMES: '',
         NUMBER_OF_PREFERRED_EXAMPLES: 10,
+
+        // This currently hides the whole section
+        // making it impossible to reveal the section
+        // from a Kanji card
+        // This should be fixed in the future
+        DISABLE_FOR_KANJI_CARDS: false,
 
         // Setting the host for the API manually to allow
         // for a proxy that caches the responses and
@@ -366,13 +372,19 @@
         for (const element of elements) {
             const href = element.getAttribute('href');
             const text = element.textContent.trim();
+            let kind = '';
+            if (href.includes('/kanji/')) {
+                kind = 'Kanji';
+            } else if (href.includes('/vocabulary/')) {
+                kind = 'Vocabulary';
+            }
 
             // Match the href to extract kanji or vocabulary (ignoring ID if present)
             const match = href.match(/\/(kanji|vocabulary)\/(?:\d+\/)?([^\#]*)#/);
-            if (match) return match[2].trim();
-            if (text) return text.trim();
+            if (match) return { kind, vocab: match[2].trim() };
+            if (text) return { kind, vocab: text.trim() };
         }
-        return '';
+        return { kind: '', vocab: '' };
     }
 
     function parseVocabFromReview() {
@@ -403,7 +415,9 @@
         if (kindText === 'Vocabulary' || kindText === 'New') {
             // Select the element with class 'plain' to extract vocabulary
             const plainElement = document.querySelector('.plain');
-            if (!plainElement) return '';
+            if (!plainElement) {
+                return { kind: kindText, vocab: '' };
+            }
 
             let vocabulary = plainElement.textContent.trim();
             const nestedVocabularyElement = plainElement.querySelector('div:not([style])');
@@ -421,22 +435,24 @@
             const kanjiRegex = /[\u4e00-\u9faf\u3400-\u4dbf]/;
             if (kanjiRegex.test(vocabulary) || vocabulary) {
                 console.log('Found Vocabulary:', vocabulary);
-                return vocabulary;
+                return { kind: kindText, vocab: vocabulary };
             }
         } else if (kindText === 'Kanji') {
             // Select the hidden input element to extract kanji
             const hiddenInput = document.querySelector('input[name="c"]');
-            if (!hiddenInput) return '';
+            if (!hiddenInput) {
+                return { kind: kindText, vocab: '' };
+            }
 
             const vocab = hiddenInput.value.split(',')[1];
             const kanjiRegex = /[\u4e00-\u9faf\u3400-\u4dbf]/;
             if (kanjiRegex.test(vocab)) {
                 console.log('Found Kanji:', vocab);
-                return vocab;
+                return { kind: kindText, vocab };
             }
         }
 
-        return '';
+        return { kind: kindText, vocab: '' };
     }
 
     function parseVocabFromVocabulary() {
@@ -1818,11 +1834,22 @@
         if (url.includes('/vocabulary/')) {
             state.vocab = parseVocabFromVocabulary();
         } else if (url.includes('c=')) {
-            state.vocab = parseVocabFromAnswer();
+            const { kind, vocab } = parseVocabFromReview();
+            if (kind === 'Kanji') {
+                state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? vocab : null;
+            } else {
+                state.vocab = vocab;
+            }
         } else if (url.includes('/kanji/')) {
-            state.vocab = parseVocabFromKanji();
+            state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? parseVocabFromKanji() : null;
         } else {
-            state.vocab = parseVocabFromReview();
+            const { kind, vocab } = parseVocabFromReview();
+            console.log(kind, vocab);
+            if (kind === 'Kanji') {
+                state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? vocab : null;
+            } else {
+                state.vocab = vocab;
+            }
         }
 
         // Retrieve stored data for the current vocabulary
