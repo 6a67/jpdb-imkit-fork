@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.15
+// @version      0.1.16
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -1112,7 +1112,8 @@
         sentenceText.style.marginTop = '10px';
         sentenceText.style.fontSize = CONFIG.SENTENCE_FONT_SIZE;
         sentenceText.style.color = 'lightgray';
-        sentenceText.style.maxWidth = '100%';
+        sentenceText.style.width = '0';
+        sentenceText.style.minWidth = '100%';
         sentenceText.style.whiteSpace = 'pre-wrap';
         sentenceText.style.textAlign = 'center'; // Center the text horizontally
         wrapperDiv.appendChild(sentenceText);
@@ -1124,7 +1125,8 @@
             translationText.style.fontSize = CONFIG.TRANSLATION_FONT_SIZE;
             translationText.style.color = 'var(--subsection-label-color)';
             // translationText.style.maxWidth = CONFIG.IMAGE_WIDTH;
-            translationText.style.maxWidth = '100%';
+            translationText.style.width = '0';
+            translationText.style.minWidth = '100%';
             translationText.style.whiteSpace = 'pre-wrap';
             wrapperDiv.appendChild(translationText);
         }
