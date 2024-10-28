@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.10
+// @version      0.1.11
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -426,7 +426,7 @@
                 // Remove furigana
                 plainPlainElement.querySelectorAll('rt').forEach((rt) => rt.remove());
                 vocabulary = plainPlainElement.textContent.trim();
-            } 
+            }
 
             // Regular expression to check if the vocabulary contains kanji characters
             const kanjiRegex = /[\u4e00-\u9faf\u3400-\u4dbf]/;
@@ -781,7 +781,6 @@
         const example = state.examples[state.currentExampleIndex] || {};
         const imageUrl = example.image_url || null;
         const soundUrl = example.sound_url || null;
-        const sentence = (CONFIG.SHOW_FURIGANA ? example.sentence_with_furigana : example.sentence) || null;
 
         // Remove any existing container
         removeExistingContainer();
@@ -806,7 +805,7 @@
         }
 
         // Append sentence and translation or a placeholder text
-        sentence ? appendSentenceAndTranslation(wrapperDiv, sentence, example.translation) : appendNoneText(wrapperDiv);
+        example ? appendSentenceAndTranslation(wrapperDiv, example, state.vocab) : appendNoneText(wrapperDiv);
 
         // Create navigation elements
         const navigationDiv = createNavigationDiv();
@@ -879,24 +878,24 @@
         return imageElement;
     }
 
-    // TODO: Highlight not working for partial matches
-    //       - sentence has "二人" and vocab is "二", nothing is highlighted
-    function highlightVocab(sentence, vocab) {
-        const div = document.createElement('div');
+    function findSublistIndices(mainList, subList) {
+        const indices = [];
+        const subLength = subList.length;
 
-        // Highlight vocabulary in the sentence based on configuration
-        if (!CONFIG.COLORED_SENTENCE_TEXT) {
-            div.textContent = sentence;
-            return div;
+        for (let i = 0; i <= mainList.length - subLength; i++) {
+            // Check if the slice of mainList matches the subList
+            if (mainList.slice(i, i + subLength).every((value, index) => value === subList[index])) {
+                // Add each index in this range to the indices array
+                for (let j = 0; j < subLength; j++) {
+                    indices.push(i + j);
+                }
+            }
         }
 
-        copyStylesToClass('.answer-box .sentence > .highlight', 'immkit-highlight', [
-            'margin-top',
-            'margin-bottom',
-            'margin-left',
-            'margin-right',
-        ]);
+        return indices;
+    }
 
+    function parseFuriganaExample(data, vocab) {
         class TextFragment {
             constructor(text, furigana, isHighlighted) {
                 this.text = text;
@@ -905,13 +904,31 @@
             }
         }
 
-        // ([^ ]+)\[([^ ]+)\]([^ ]*) ?
-        const regex = /([^ ]+)\[([^ ]+)\]([^ ]*) ?|([^ ]+) ?/g;
+        class ResultFragment {
+            constructor(textParts, furigana) {
+                this.textParts = textParts;
+                this.furigana = furigana;
+            }
+        }
+
+        class ResultTextParts {
+            constructor(char, isHighlighted) {
+                this.char = char;
+                this.isHighlighted = isHighlighted;
+            }
+
+            toString() {
+                return `('${this.char}', ${this.isHighlighted})`;
+            }
+        }
+
+        // Parse furigana
+        const regex = /([^ ]+)\[([^ ]*)\]([^ ]*) ?|([^ ]+) ?/g;
         const fragments = [];
         let match;
         let lastIndex = 0;
 
-        while ((match = regex.exec(sentence)) !== null) {
+        while ((match = regex.exec(data.sentence_with_furigana)) !== null) {
             const kanji = match[1] || '';
             const furigana = match[2] || '';
             const after = match[3] || '';
@@ -937,90 +954,147 @@
             lastIndex = regex.lastIndex;
         }
 
-        if (lastIndex < sentence.length) {
-            const lastText = sentence.slice(lastIndex);
+        if (lastIndex < data.sentence_with_furigana.length) {
+            const lastText = data.sentence_with_furigana.slice(lastIndex);
             for (const char of lastText) {
                 fragments.push(new TextFragment(char, '', false));
             }
         }
 
-        ///
-        const vocabArray = typeof vocab === 'string' ? [vocab] : vocab;
-
-        // For each vocab word, try to find matching sequences of fragments
-        vocabArray.forEach((word) => {
-            // Check each possible starting position
-            for (let i = 0; i < fragments.length; i++) {
-                let concatenated = '';
-                let j = i;
-
-                // Build up concatenated text from consecutive fragments
-                while (j < fragments.length) {
-                    concatenated += fragments[j].text;
-
-                    // If we've found a match
-                    if (concatenated === word) {
-                        // Mark all fragments in the matching sequence as highlighted
-                        for (let k = i; k <= j; k++) {
-                            fragments[k].isHighlighted = true;
-                        }
-                        break;
-                    }
-                    // If we've exceeded the word length, no point continuing
-                    if (concatenated.length >= word.length) {
-                        break;
-                    }
-                    j++;
-                }
+        // Parse word list
+        const wordList = [];
+        for (let i = 0; i < data.word_list.length; i++) {
+            const currentWordHighlighted = data.word_index.includes(i);
+            for (const char of data.word_list[i]) {
+                wordList.push(new TextFragment(char, '', currentWordHighlighted));
             }
-        });
+        }
+
+        // Merge for final output
+        const finalOutput = [];
+        let wordListIndex = 0;
+        let fragmentIndex = 0;
+
+        while (wordListIndex < wordList.length && fragmentIndex < fragments.length) {
+            let currentWordListElement = wordList[wordListIndex];
+            let currentFragment = fragments[fragmentIndex];
+
+            let currentWordListChar = currentWordListElement.text; // This is always only one char
+            let currentFragmentText = currentFragment.text; // This is might be more than one char, e.g. when multiple kanji together have furigana
+
+            // Add all chars that are only part of the word list but not part of the furigana
+            // This mostly happens with whitespaces
+            while (currentWordListChar !== currentFragmentText.charAt(0)) {
+                finalOutput.push(new ResultFragment([new ResultTextParts(currentWordListChar, currentWordListElement.isHighlighted)], ''));
+                wordListIndex++;
+                if (wordListIndex >= wordList.length) {
+                    break;
+                }
+                currentWordListElement = wordList[wordListIndex];
+                currentWordListChar = currentWordListElement.text;
+            }
+
+            // let isHighlighted = currentWordListElement.isHighlighted;
+
+            const fragmentChars = currentFragmentText.split('');
+            let fragmentCharIndex = 0;
+
+            const textParts = [];
+
+            // Add chars that are part of the furigana fragment list
+            while (
+                fragmentChars[fragmentCharIndex] === currentWordListChar &&
+                wordListIndex < wordList.length &&
+                fragmentCharIndex < fragmentChars.length
+            ) {
+                const isHighlighted = currentWordListElement.isHighlighted;
+                textParts.push(new ResultTextParts(currentWordListChar, isHighlighted));
+                wordListIndex++;
+                fragmentCharIndex++;
+
+                if (wordListIndex >= wordList.length) {
+                    break;
+                }
+                currentWordListElement = wordList[wordListIndex];
+                currentWordListChar = currentWordListElement.text;
+            }
+
+            finalOutput.push(new ResultFragment(textParts, currentFragment.furigana));
+            fragmentIndex++;
+        }
+
+        const flattenedOutput = [];
+        for (const fragment of finalOutput) {
+            for (const textPart of fragment.textParts) {
+                flattenedOutput.push(textPart.char);
+            }
+        }
+
+        const vocabChars = vocab.split('');
+
+        const additionalHighlighting = findSublistIndices(flattenedOutput, vocabChars);
+
+        let highlightIndex = 0;
+        for (const fragment of finalOutput) {
+            for (const textPart of fragment.textParts) {
+                if (additionalHighlighting.includes(highlightIndex)) {
+                    textPart.isHighlighted = true;
+                }
+                highlightIndex++;
+            }
+        }
+
+        return finalOutput;
+    }
+
+    function getSentenceDiv(parsedExample) {
+        const div = document.createElement('div');
+
+        copyStylesToClass('.answer-box .sentence > .highlight', 'immkit-highlight', [
+            'margin-top',
+            'margin-bottom',
+            'margin-left',
+            'margin-right',
+        ]);
 
         let innerHTML = '';
         let wasHighlighted = false;
 
-        for (const fragment of fragments) {
-            let text = fragment.furigana ? `<ruby>${fragment.text}<rt>${fragment.furigana}</rt></ruby>` : fragment.text;
+        for (const fragment of parsedExample) {
+            let text = '';
+            const allHighlighted = fragment.textParts.every((part) => part.isHighlighted);
+            const allNotHighlighted = fragment.textParts.every((part) => !part.isHighlighted);
 
-            if (!wasHighlighted && fragment.isHighlighted) {
-                innerHTML += '<span class="highlight immkit-highlight">';
-                wasHighlighted = true;
-            }
-
-            if (wasHighlighted && !fragment.isHighlighted) {
-                innerHTML += '</span>';
-                wasHighlighted = false;
-            }
-
-            // Partial fix for the TODO above
-            if (!fragment.isHighlighted) {
-                let index = text.indexOf(vocab);
-                const highlightStart = '<span class="highlight immkit-highlight">';
-                const highlightEnd = '</span>';
-                const offset = highlightStart.length + highlightEnd.length;
-                
-                while (index !== -1) {
-                    text = text.substring(0, index) + 
-                           highlightStart + 
-                           text.substring(index, index + vocab.length) + 
-                           highlightEnd + 
-                           text.substring(index + vocab.length);
-                    
-                    // Move index past the current highlight plus the HTML tags
-                    index = text.indexOf(vocab, index + vocab.length + offset);
+            if (allHighlighted || allNotHighlighted) {
+                const collectedText = fragment.textParts.map((part) => part.char).join('');
+                const furigana = fragment.furigana;
+                text = collectedText;
+                if (CONFIG.SHOW_FURIGANA) {
+                    text = furigana ? `<ruby>${collectedText}<rt>${furigana}</rt></ruby>` : collectedText;
                 }
+                if (allHighlighted && CONFIG.COLORED_SENTENCE_TEXT) {
+                    text = `<span class="highlight immkit-highlight">${text}</span>`;
+                }
+            } else {
+                for (const part of fragment.textParts) {
+                    let partText = part.char;
+                    if (part.isHighlighted && CONFIG.COLORED_SENTENCE_TEXT) {
+                        partText = `<span class="highlight immkit-highlight">${partText}</span>`;
+                    }
+                    text += partText;
+                }
+                text = CONFIG.SHOW_FURIGANA ? `<ruby>${text}<rt>${fragment.furigana}</rt></ruby>` : text;
             }
-
-            innerHTML += text;
+            div.innerHTML += text;
         }
-
-        div.innerHTML = innerHTML;
 
         return div;
     }
 
-    function appendSentenceAndTranslation(wrapperDiv, sentence, translation) {
+    function appendSentenceAndTranslation(wrapperDiv, example, vocab) {
         // Append sentence and translation to the wrapper div
-        const sentenceText = highlightVocab(sentence, state.vocab);
+        const parsedExample = parseFuriganaExample(example, vocab);
+        const sentenceText = getSentenceDiv(parsedExample);
         sentenceText.style.marginTop = '10px';
         sentenceText.style.fontSize = CONFIG.SENTENCE_FONT_SIZE;
         sentenceText.style.color = 'lightgray';
@@ -1029,9 +1103,9 @@
         sentenceText.style.textAlign = 'center'; // Center the text horizontally
         wrapperDiv.appendChild(sentenceText);
 
-        if (CONFIG.ENABLE_EXAMPLE_TRANSLATION && translation) {
+        if (CONFIG.ENABLE_EXAMPLE_TRANSLATION && example.translation) {
             const translationText = document.createElement('div');
-            translationText.innerHTML = replaceSpecialCharacters(translation);
+            translationText.innerHTML = replaceSpecialCharacters(example.translation);
             translationText.style.marginTop = '5px';
             translationText.style.fontSize = CONFIG.TRANSLATION_FONT_SIZE;
             translationText.style.color = 'var(--subsection-label-color)';
