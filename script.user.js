@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.13
+// @version      0.1.14
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -897,102 +897,149 @@
 
     function parseFuriganaExample(data, vocab) {
         class TextFragment {
+            /**
+             * Creates a TextFragment instance.
+             * @param {string} text - The main text (e.g., kanji characters).
+             * @param {string} [furigana=''] - The furigana reading for the text.
+             * @param {boolean} [isHighlighted=false] - Indicates if the text should be highlighted.
+             */
             constructor(text, furigana = '', isHighlighted = false) {
                 this.text = text;
                 this.furigana = furigana;
                 this.isHighlighted = isHighlighted;
             }
         }
-    
+
         class ResultFragment {
+            /**
+             * Creates a ResultFragment instance.
+             * @param {ResultTextParts[]} textParts - Array of text parts.
+             * @param {string} furigana - The furigana associated with the text parts.
+             */
             constructor(textParts, furigana) {
                 this.textParts = textParts;
                 this.furigana = furigana;
             }
         }
-    
+
         class ResultTextParts {
+            /**
+             * Creates a ResultTextParts instance.
+             * @param {string} char - A single character.
+             * @param {boolean} isHighlighted - Indicates if the character should be highlighted.
+             */
             constructor(char, isHighlighted) {
                 this.char = char;
                 this.isHighlighted = isHighlighted;
             }
-    
+
             toString() {
                 return `('${this.char}', ${this.isHighlighted})`;
             }
         }
-    
+
+        // Parses the sentence with furigana annotations into text fragments.
         const parseFurigana = (sentence) => {
+            // Regular expression to match kanji with optional furigana and subsequent characters
             const regex = /([^ ]+)\[([^ ]*)\]([^ ]*) ?|([^ ]+) ?/g;
             const fragments = [];
             let match;
-    
+
             while ((match = regex.exec(sentence)) !== null) {
                 const [kanji, furigana, after, nonFuriganaSection] = [match[1] || '', match[2] || '', match[3] || '', match[4] || ''];
-    
+
+                // If kanji is present, create a TextFragment with furigana
                 if (kanji) fragments.push(new TextFragment(kanji, furigana));
+
+                // Add each character after the furigana as separate TextFragments
                 for (const char of after + nonFuriganaSection) {
                     fragments.push(new TextFragment(char));
                 }
             }
-    
+
             return fragments;
         };
-    
+
+        // Parses the list of words and marks which words are highlighted based on their indices.
         const parseWordList = (wordList, wordIndex) => {
             const parsedList = [];
-            
+
+            // Iterate through each word in the word list
             wordList.forEach((word, i) => {
+                // Determine if the current word should be highlighted
                 const isHighlighted = wordIndex.includes(i);
+
+                // Create a TextFragment for each character in the word with the highlight status
                 for (const char of word) {
                     parsedList.push(new TextFragment(char, '', isHighlighted));
                 }
             });
-    
+
             return parsedList;
         };
-    
+
+        // Merges the parsed word list with the furigana fragments to create the final output.
         const mergeFragments = (wordList, fragments) => {
             const finalOutput = [];
             let wordListIndex = 0;
             let fragmentIndex = 0;
-    
+
             while (wordListIndex < wordList.length && fragmentIndex < fragments.length) {
                 let currentWordListChar = wordList[wordListIndex].text;
                 let currentFragmentText = fragments[fragmentIndex].text;
-    
+
+                /**
+                 * Handle characters in wordList that are not part of the current fragment.
+                 * This often includes spaces that are part of the word list but not part of the furigana sentence.
+                 */
                 while (currentWordListChar !== currentFragmentText.charAt(0)) {
-                    finalOutput.push(new ResultFragment([new ResultTextParts(currentWordListChar, wordList[wordListIndex].isHighlighted)], ''));
+                    // Create a ResultFragment without furigana for unmatched characters
+                    finalOutput.push(
+                        new ResultFragment([new ResultTextParts(currentWordListChar, wordList[wordListIndex].isHighlighted)], '')
+                    );
+
+                    // Move to the next character in wordList
                     if (++wordListIndex >= wordList.length) break;
                     currentWordListChar = wordList[wordListIndex].text;
                 }
-    
+
                 const textParts = [];
                 const fragmentChars = currentFragmentText.split('');
-                
+
+                // Iterate through each character in the current fragment
                 for (let i = 0; i < fragmentChars.length && wordListIndex < wordList.length; i++) {
                     if (fragmentChars[i] === currentWordListChar) {
+                        // Add the matched character with its highlight status
                         textParts.push(new ResultTextParts(currentWordListChar, wordList[wordListIndex].isHighlighted));
-                        if (++wordListIndex < wordList.length) currentWordListChar = wordList[wordListIndex].text;
+
+                        // Move to the next character in wordList
+                        if (++wordListIndex < wordList.length) {
+                            currentWordListChar = wordList[wordListIndex].text;
+                        }
                     }
                 }
-    
+
+                // Create a ResultFragment with the collected text parts and associated furigana
                 finalOutput.push(new ResultFragment(textParts, fragments[fragmentIndex].furigana));
                 fragmentIndex++;
             }
-    
+
             return finalOutput;
         };
-    
+
+        // Applies additional highlighting to characters that match the vocabulary literally.
         const applyAdditionalHighlighting = (finalOutput, vocabChars) => {
-            const flattenedOutput = finalOutput.flatMap(fragment => fragment.textParts.map(part => part.char));
-            
+            // Flatten all characters from the final output for easier indexing
+            const flattenedOutput = finalOutput.flatMap((fragment) => fragment.textParts.map((part) => part.char));
+
+            // Find all starting indices where the vocabulary characters appear as a sublist
             const additionalHighlightingIndices = findSublistIndices(flattenedOutput, vocabChars);
-    
+
             let highlightIndex = 0;
-            
+
             for (const fragment of finalOutput) {
                 for (const textPart of fragment.textParts) {
+                    // If the current index is in the list of indices to highlight, set isHighlighted to true
                     if (additionalHighlightingIndices.includes(highlightIndex)) {
                         textPart.isHighlighted = true;
                     }
@@ -1000,16 +1047,22 @@
                 }
             }
         };
-    
+
+        // Step 1: Parse the sentence with furigana into text fragments
         const fragments = parseFurigana(data.sentence_with_furigana);
+
+        // Step 2: Parse the word list and determine which words are highlighted
         const wordListParsed = parseWordList(data.word_list, data.word_index);
+
+        // Step 3: Merge the word list with furigana fragments to form the final structured output
         const finalOutput = mergeFragments(wordListParsed, fragments);
-    
+
+        // Step 4: Apply additional highlighting based on the provided vocabulary
         applyAdditionalHighlighting(finalOutput, vocab.split(''));
-    
+
+        // Return the fully processed and structured output
         return finalOutput;
     }
-    
 
     function getSentenceDiv(parsedExample) {
         const div = document.createElement('div');
