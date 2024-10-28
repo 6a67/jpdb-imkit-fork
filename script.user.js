@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.11
+// @version      0.1.12
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -58,7 +58,7 @@
         embedAboveSubsectionMeanings: false,
         preloadedIndices: new Set(),
         currentAudio: null,
-        exactSearch: true,
+        exactSearch: false,
     };
 
     function getSpecificStyles(selector) {
