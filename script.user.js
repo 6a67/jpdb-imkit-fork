@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      1.14.2
+// @version      1.14.3
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -906,7 +906,7 @@
         }
 
         // Append sentence and translation or a placeholder text
-        example ? appendSentenceAndTranslation(wrapperDiv, example, state.vocab) : appendNoneText(wrapperDiv);
+        example && state.apiDataFetched ? appendSentenceAndTranslation(wrapperDiv, example, state.vocab) : appendNoneText(wrapperDiv);
 
         // Create navigation elements
         const navigationDiv = createNavigationDiv();
@@ -1208,6 +1208,7 @@
 
     function appendSentenceAndTranslation(wrapperDiv, example, vocab) {
         // Append sentence and translation to the wrapper div
+        console.log(example);
         const parsedExample = parseFuriganaExample(example, vocab);
         const sentenceText = getSentenceDiv(parsedExample);
         sentenceText.style.marginTop = '10px';
