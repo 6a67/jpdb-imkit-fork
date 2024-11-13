@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      0.1.16
+// @version      1.14.2
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
 // @match        https://jpdb.io/vocabulary/*
 // @match        https://jpdb.io/kanji/*
+// @match        https://jpdb.io/search*
 // @grant        GM_addElement
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
@@ -59,6 +60,7 @@
         preloadedIndices: new Set(),
         currentAudio: null,
         exactSearch: false,
+        error: false
     };
 
     function getSpecificStyles(selector) {
@@ -173,10 +175,23 @@
                 const transaction = db.transaction(['dataStore'], 'readonly');
                 const store = transaction.objectStore('dataStore');
                 const request = store.get(keyword);
-                request.onsuccess = function (event) {
+                request.onsuccess = async function(event) {
                     const result = event.target.result;
-                    if (result && Date.now() - result.timestamp < this.EXPIRATION_TIME) {
-                        resolve(result.data);
+                    if (result) {
+                        const isExpired = Date.now() - result.timestamp >= this.EXPIRATION_TIME;
+                        const validationError = validateApiResponse(result.data);
+
+                        if (isExpired) {
+                            console.log(`Deleting entry for keyword "${keyword}" because it is expired.`);
+                            await this.deleteEntry(db, keyword);
+                            resolve(null);
+                        } else if (validationError) {
+                            console.log(`Deleting entry for keyword "${keyword}" due to validation error: ${validationError}`);
+                            await this.deleteEntry(db, keyword);
+                            resolve(null);
+                        } else {
+                            resolve(result.data);
+                        }
                     } else {
                         resolve(null);
                     }
@@ -186,6 +201,17 @@
                 };
             });
         },
+
+        deleteEntry(db, keyword) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['dataStore'], 'readwrite');
+                const store = transaction.objectStore('dataStore');
+                const request = store.delete(keyword);
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => reject('IndexedDB delete error: ' + e.target.errorCode);
+            });
+        },
+
 
         getAll(db) {
             return new Promise((resolve, reject) => {
@@ -210,6 +236,13 @@
         save(db, keyword, data) {
             return new Promise(async (resolve, reject) => {
                 try {
+                    const validationError = validateApiResponse(data);
+                    if (validationError) {
+                        console.log(`Invalid data detected: ${validationError}. Not saving to IndexedDB.`);
+                        resolve();
+                        return;
+                    }
+
                     const entries = await this.getAll(db);
                     const transaction = db.transaction(['dataStore'], 'readwrite');
                     const store = transaction.objectStore('dataStore');
@@ -236,8 +269,8 @@
                         console.log('IndexedDB updated successfully.');
                     };
 
-                    transaction.onerror = function (event) {
-                        reject('IndexedDB updated failed: ' + event.target.errorCode);
+                    transaction.onerror = function(event) {
+                        reject('IndexedDB update failed: ' + event.target.errorCode);
                     };
                 } catch (error) {
                     reject(`Error in saveToIndexedDB: ${error}`);
@@ -271,55 +304,71 @@
             const url = `${CONFIG.API_HOST}/look_up_dictionary?keyword=${encodeURIComponent(searchVocab)}&sort=shortness&min_length=${
                 CONFIG.MINIMUM_EXAMPLE_LENGTH
             }`;
-            try {
-                const db = await IndexedDBManager.open();
-                const cachedData = await IndexedDBManager.get(db, searchVocab);
-                if (cachedData && cachedData.data && Array.isArray(cachedData.data) && cachedData.data.length > 0) {
-                    console.log('Data retrieved from IndexedDB');
-                    state.examples = cachedData.data[0].examples;
-                    // add to each example its original index
-                    state.examples.forEach((example, index) => {
-                        example.originalIndex = index;
-                    });
-                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.04) + 1);
-                    state.examples = sortPreferredDecksFirst(state.examples);
-                    state.apiDataFetched = true;
-                    resolve();
-                } else {
-                    console.log(`Calling API for: ${searchVocab}`);
-                    GM_xmlhttpRequest({
-                        method: 'GET',
-                        url: url,
-                        onload: async function (response) {
-                            if (response.status === 200) {
-                                const jsonData = parseJSON(response.responseText);
-                                console.log('API JSON Received');
-                                console.log(url);
-                                if (validateApiResponse(jsonData)) {
-                                    state.examples = jsonData.data[0].examples;
-                                    state.examples.forEach((example, index) => {
-                                        example.originalIndex = index;
-                                    });
-                                    state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.04) + 1);
-                                    state.examples = sortPreferredDecksFirst(state.examples);
-                                    state.apiDataFetched = true;
-                                    await IndexedDBManager.save(db, searchVocab, jsonData);
-                                    resolve();
+            const maxRetries = 5;
+            let attempt = 0;
+
+            async function fetchData() {
+                try {
+                    const db = await IndexedDBManager.open();
+                    const cachedData = await IndexedDBManager.get(db, searchVocab);
+                    if (cachedData && Array.isArray(cachedData.data) && cachedData.data.length > 0) {
+                        console.log('Data retrieved from IndexedDB');
+                        state.examples = cachedData.data[0].examples;
+                        // add to each example its original index
+                        state.examples.forEach((example, index) => {
+                            example.originalIndex = index;
+                        });
+                        state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.04) + 1);
+                        state.examples = sortPreferredDecksFirst(state.examples);
+                        state.apiDataFetched = true;
+                        resolve();
+                    } else {
+                        console.log(`Calling API for: ${searchVocab}`);
+                        GM_xmlhttpRequest({
+                            method: 'GET',
+                            url: url,
+                            onload: async function (response) {
+                                if (response.status === 200) {
+                                    const jsonData = parseJSON(response.responseText);
+                                    console.log('API JSON Received');
+                                    console.log(url);
+                                    const validationError = validateApiResponse(jsonData);
+                                    if (!validationError) {
+                                        state.examples = jsonData.data[0].examples;
+                                        state.examples.forEach((example, index) => {
+                                            example.originalIndex = index;
+                                        });
+                                        state.examples = shuffleWithinRange(state.examples, Math.floor(state.examples.length * 0.04) + 1);
+                                        state.examples = sortPreferredDecksFirst(state.examples);
+                                        state.apiDataFetched = true;
+                                        await IndexedDBManager.save(db, searchVocab, jsonData);
+                                        resolve();
+                                    } else {
+                                        attempt++;
+                                        if (attempt < maxRetries) {
+                                            console.log(`Validation error: ${validationError}. Retrying... (${attempt}/${maxRetries})`);
+                                            fetchData();
+                                        } else {
+                                            reject(`Invalid API response after ${maxRetries} attempts: ${validationError}`);
+                                            state.error = true;
+                                            embedImageAndPlayAudio(); //update displayed text
+                                        }
+                                    }
                                 } else {
-                                    reject('Invalid API response');
+                                    reject(`API call failed with status: ${response.status}`);
                                 }
-                            } else {
-                                reject(`API call failed with status: ${response.status}`);
-                            }
-                        },
-                        onerror: function (error) {
-                            reject(`An error occurred: ${error}`);
-                        },
-                    });
+                            },
+                            onerror: function (error) {
+                                reject(`An error occurred: ${error}`);
+                            },
+                        });
+                    }
+                } catch (error) {
+                    reject(`Error: ${error}`);
                 }
-            } catch (error) {
-                reject(`Error: ${error}`);
             }
+
+            fetchData();
         });
     }
 
@@ -333,8 +382,28 @@
     }
 
     function validateApiResponse(jsonData) {
-        return jsonData && jsonData.data && jsonData.data[0] && jsonData.data[0].examples;
+        state.error = false;
+        if (!jsonData) {
+            return 'Not a valid JSON';
+        }
+        if (!jsonData.data || !jsonData.data[0] || !jsonData.data[0].examples) {
+            return 'Missing required data fields';
+        }
+
+        const categoryCount = jsonData.data[0].category_count;
+        if (!categoryCount) {
+            return 'Missing category count';
+        }
+
+        // Check if all category counts are zero
+        const allZero = Object.values(categoryCount).every(count => count === 0);
+        if (allZero) {
+            return 'Blank API';
+        }
+
+        return null; // No error
     }
+
 
     //FAVORITE DATA FUNCTIONS=====================================================================================================================
     function getStoredData(key) {
@@ -488,6 +557,24 @@
             state.embedAboveSubsectionMeanings = true; // Set state flag
             kanji = kanji.split('/')[0];
             return decodeURIComponent(kanji);
+        }
+
+        // Return empty string if no match
+        return '';
+    }
+
+    function parseVocabFromSearch() {
+        // Get the current URL
+        let url = window.location.href;
+
+        // Match the URL structure for a search query, capturing the vocab between `?q=` and either `&` or `+`
+        const match = url.match(/https:\/\/jpdb\.io\/search\?q=([^&+]*)/);
+        console.log("Parsing Search Page");
+
+        if (match) {
+            // Extract and decode the vocabulary part from the URL
+            let vocab = match[1];
+            return decodeURIComponent(vocab);
         }
 
         // Return empty string if no match
@@ -792,16 +879,30 @@
         wrapperDiv.appendChild(textDiv);
 
         // Handle image rendering and click event for playing audio
-        if (imageUrl) {
-            const imageElement = createImageElement(wrapperDiv, imageUrl, vocab, state.exactSearch);
-            if (imageElement) {
-                imageElement.addEventListener('click', () => playAudio(soundUrl));
+        if (state.apiDataFetched) {
+            if (imageUrl) {
+                const imageElement = createImageElement(wrapperDiv, imageUrl, vocab, state.exactSearch);
+                if (imageElement) {
+                    imageElement.addEventListener('click', () => playAudio(soundUrl));
+                }
+            } else {
+                const noImageText = document.createElement('div');
+                noImageText.textContent = `NO IMAGE\n(${state.examples[state.currentExampleIndex].deck_name})`;
+                noImageText.style.padding = '100px 0';
+                noImageText.style.whiteSpace = 'pre'; // This ensures that newlines are respected
+                wrapperDiv.appendChild(noImageText);
             }
+        } else if (state.error) {
+            const errorText = document.createElement('div');
+            errorText.textContent = 'ERROR\nNO EXAMPLES FOUND\n\nRARE WORD OR\nIMMERSIONKIT API IS TEMPORARILY DOWN';
+            errorText.style.padding = '100px 0';
+            errorText.style.whiteSpace = 'pre'; // This ensures that newlines are respected
+            wrapperDiv.appendChild(errorText);
         } else {
-            const noImageText = document.createElement('div');
-            noImageText.textContent = 'NO IMAGE';
-            noImageText.style.padding = '100px 0';
-            wrapperDiv.appendChild(noImageText);
+            const loadingText = document.createElement('div');
+            loadingText.textContent = 'LOADING';
+            loadingText.style.padding = '100px 0';
+            wrapperDiv.appendChild(loadingText);
         }
 
         // Append sentence and translation or a placeholder text
@@ -1918,25 +2019,38 @@
         state.embedAboveSubsectionMeanings = false;
 
         const url = window.location.href;
-        if (url.includes('/vocabulary/')) {
-            state.vocab = parseVocabFromVocabulary();
-        } else if (url.includes('c=')) {
-            const { kind, vocab } = parseVocabFromReview();
-            if (kind === 'Kanji') {
-                state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? vocab : null;
+        const machineTranslationFrame = document.getElementById('machine-translation-frame');
+
+        // Proceed only if the machine translation frame is not present
+        if (!machineTranslationFrame) {
+
+            //display embed for first time with loading text
+            embedImageAndPlayAudio();
+
+            if (url.includes('/vocabulary/')) {
+                state.vocab = parseVocabFromVocabulary();
+            } else if (url.includes('/search?q=')) {
+                state.vocab = parseVocabFromSearch();
+            } else if (url.includes('c=')) {
+                const { kind, vocab } = parseVocabFromReview();
+                if (kind === 'Kanji') {
+                    state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? vocab : null;
+                } else {
+                    state.vocab = vocab;
+                }
+            } else if (url.includes('/kanji/')) {
+                state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? parseVocabFromKanji() : null;
             } else {
-                state.vocab = vocab;
+                const { kind, vocab } = parseVocabFromReview();
+                console.log(kind, vocab);
+                if (kind === 'Kanji') {
+                    state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? vocab : null;
+                } else {
+                    state.vocab = vocab;
+                }
             }
-        } else if (url.includes('/kanji/')) {
-            state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? parseVocabFromKanji() : null;
         } else {
-            const { kind, vocab } = parseVocabFromReview();
-            console.log(kind, vocab);
-            if (kind === 'Kanji') {
-                state.vocab = !CONFIG.DISABLE_FOR_KANJI_CARDS ? vocab : null;
-            } else {
-                state.vocab = vocab;
-            }
+            console.log('Machine translation frame detected, skipping vocabulary parsing.');
         }
 
         // Retrieve stored data for the current vocabulary
