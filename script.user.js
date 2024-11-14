@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      1.14.3
+// @version      1.14.4
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -2025,9 +2025,6 @@
         // Proceed only if the machine translation frame is not present
         if (!machineTranslationFrame) {
 
-            //display embed for first time with loading text
-            embedImageAndPlayAudio();
-
             if (url.includes('/vocabulary/')) {
                 state.vocab = parseVocabFromVocabulary();
             } else if (url.includes('/search?q=')) {
@@ -2052,6 +2049,11 @@
             }
         } else {
             console.log('Machine translation frame detected, skipping vocabulary parsing.');
+        }
+
+        if (state.vocab) {
+            //display embed for first time with loading text
+            embedImageAndPlayAudio();
         }
 
         // Retrieve stored data for the current vocabulary
