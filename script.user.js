@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         JPDB Immersion Kit Examples Fork
-// @version      1.14.4
+// @version      1.16.1
 // @description  Fork of awoo's JPDB Immersion Kit Examples script
 // @namespace    jpdb-imkit-fork
 // @match        https://jpdb.io/review*
@@ -60,7 +60,8 @@
         preloadedIndices: new Set(),
         currentAudio: null,
         exactSearch: false,
-        error: false
+        error: false,
+        currentlyPlayingAudio: false
     };
 
     function getSpecificStyles(selector) {
@@ -818,7 +819,14 @@
     }
 
     function playAudio(soundUrl) {
+        // Skip playing audio if it is already playing
+        if (state.currentlyPlayingAudio) {
+            //console.log('Duplicate audio was skipped.');
+            return;
+        }
+
         if (soundUrl) {
+            state.currentlyPlayingAudio = true;
             stopCurrentAudio();
 
             GM_xmlhttpRequest({
@@ -843,23 +851,31 @@
                             gainNode.gain.setValueAtTime(0, audioContext.currentTime);
                             gainNode.gain.linearRampToValueAtTime(CONFIG.SOUND_VOLUME / 100, audioContext.currentTime + 0.1);
 
-                            // Play the audio, skip the first part to avoid any "pop"
-                            source.start(0, 0.05);
+                        // Play the audio, skip the first part to avoid any "pop"
+                        source.start(0, 0.05);
 
-                            // Save the current audio context and source for stopping later
-                            state.currentAudio = {
-                                context: audioContext,
-                                source: source,
-                            };
-                        },
-                        function (error) {
-                            console.error('Error decoding audio:', error);
-                        }
-                    );
+                        // Log when the audio starts playing
+                        //console.log('Audio has started playing.');
+
+                        // Save the current audio context and source for stopping later
+                        state.currentAudio = {
+                            context: audioContext,
+                            source: source
+                        };
+
+                        // Set currentlyPlayingAudio to false when the audio ends
+                        source.onended = function() {
+                            state.currentlyPlayingAudio = false;
+                        };
+                    }, function(error) {
+                        console.error('Error decoding audio:', error);
+                        state.currentlyPlayingAudio = false;
+                    });
                 },
                 onerror: function (error) {
                     console.error('Error fetching audio:', error);
-                },
+                    state.currentlyPlayingAudio = false;
+                }
             });
         }
     }
@@ -1265,6 +1281,7 @@
         leftArrow.addEventListener('click', () => {
             if (state.currentExampleIndex > 0) {
                 state.currentExampleIndex--;
+                state.currentlyPlayingAudio = false;
                 renderImageAndPlayAudio(vocab, shouldAutoPlaySound);
                 preloadImages();
             }
@@ -1281,6 +1298,7 @@
         rightArrow.addEventListener('click', () => {
             if (state.currentExampleIndex < state.examples.length - 1) {
                 state.currentExampleIndex++;
+                state.currentlyPlayingAudio = false;
                 renderImageAndPlayAudio(vocab, shouldAutoPlaySound);
                 preloadImages();
             }
@@ -2084,7 +2102,7 @@
             }
 
             embedImageAndPlayAudio();
-            preloadImages();
+            //preloadImages();
         }
     }
 
@@ -2106,5 +2124,5 @@
 
     // Initial configuration and preloading
     loadConfig();
-    preloadImages();
+    //preloadImages();
 })();
